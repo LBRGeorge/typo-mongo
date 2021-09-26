@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+     "target": "es2016",
+     "module": "commonjs",
+     "moduleResolution": "node",
+     "rootDir": "./src",
+     "outDir": "./build",
+     "emitDecoratorMetadata": true,
+     "experimentalDecorators": true,
+     "esModuleInterop": true,
+     "sourceMap": true,
+     // Ensure that .d.ts files are created by tsc, but not .js files
+     "declaration": true,
+  },
+  "include": [
+     "src/**/*.ts"
+  ],
+  "exclude": [
+     ".vscode",
+     "dist",
+     "build",
+     "bin",
+     "node_modules",
+  ]
+}

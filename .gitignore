@@ -1,0 +1,13 @@
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+tmp/
+temp/
+.DS_Store
+.env
+.npmrc
+package-lock.json
+yarn.lock
+.editorconfig
