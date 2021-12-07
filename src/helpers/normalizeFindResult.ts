@@ -1,14 +1,20 @@
 import { ModelMetadata } from '../metadata/ModelMetadata'
-import { FindOneOptions } from '../interfaces/FindOneOptions'
+import { FindOptions } from '../interfaces/FindOptions'
 import { BaseRepository } from '../repository/BaseRepository'
 import { FieldMetadata } from '../metadata/FieldMetadata'
 
-export const normalizeFindResult = async <T>(baseMetadata: ModelMetadata, result: T, options?: FindOneOptions<T>): Promise<T> => {
+const POPULATED_KEYS: string[] = []
+
+export const normalizeFindResult = async <T>(baseMetadata: ModelMetadata, result: T, options?: FindOptions<T>): Promise<T> => {
   if (options.populate) {
     for await (const prop of options.populate) {
       const nested = prop.toString().split('.')
+
       result = await nestedPopulate<T>(baseMetadata, result, nested)
     }
+
+    // Clear populated keys
+    POPULATED_KEYS.splice(0, POPULATED_KEYS.length)
   }
 
   return result
@@ -20,13 +26,20 @@ const nestedPopulate = async <T>(baseMetadata: ModelMetadata, result: T, nestedI
 
   // Get current metadata
   const fieldMetadata = baseMetadata.fields.find(v => v.propertyName === field)
-  
+
   if (result[field] && fieldMetadata && fieldMetadata.getReferenceField()) {
-    result = await populate<T>(fieldMetadata, result, field)
-    
+    const populateKey = [baseMetadata.targetName, field].join('_')
+
+    if (!POPULATED_KEYS.includes(populateKey)) {
+      result = await populate<T>(fieldMetadata, result, field)
+      
+      // Set this field as already populated, so we will not repopulate on this current operation
+      POPULATED_KEYS.push(populateKey)
+    }
+
     if (nestedItems.length > 0) {
       // We should pass the next model to find the reference
-      return nestedPopulate(fieldMetadata.getReferenceField().modelMetadata, result[field], nestedItems)
+      result[field] = await nestedPopulate(fieldMetadata.getReferenceField().modelMetadata, result[field], nestedItems)
     }
   }
 
@@ -44,10 +57,21 @@ const populate = async <T>(metadata: FieldMetadata, result: T, field: string): P
   repo.metadata = ref.modelMetadata
   repo.collection = ref.modelMetadata.collection
 
-  const query: any = {
-    [ref.propertyName]: result[field]
+  let referred = null
+
+  if (result[field] instanceof Array) {
+    const query: any = {
+      [ref.propertyName]: {
+        $in: result[field]
+      }
+    }
+    referred = await repo.find(query)
+  } else {
+    const query: any = {
+      [ref.propertyName]: result[field]
+    }
+    referred = await repo.findOne(query)
   }
-  const referred = await repo.findOne(query)
 
   if (referred) {
     result[field] = referred

@@ -1,8 +1,9 @@
 import { Collection, CollectionInsertManyOptions, CollectionInsertOneOptions, FilterQuery, ObjectID, OptionalId, UpdateManyOptions, UpdateOneOptions, UpdateQuery } from 'mongodb'
-import { getMetadataStorage, ModelMetadata } from '..'
+import { ModelMetadata } from '../metadata/ModelMetadata'
+import { getMetadataStorage } from '../metadata-args/MetadataArgsStorage'
 import { normalizeFindResult } from '../helpers/normalizeFindResult'
 import { normalizeObjectId } from '../helpers/normalizeObjectId'
-import { FindOneOptions } from '../interfaces/FindOneOptions'
+import { FindOptions } from '../interfaces/FindOptions'
 
 export class BaseRepository<T> {
 
@@ -56,24 +57,31 @@ export class BaseRepository<T> {
     return doc
   }
 
-  private async postQuery(result: T | T[], options?: FindOneOptions<T>) {
+  private async postQuery(result: T | T[], options?: FindOptions<T>) {
     if (options) {
       if (result instanceof Array) {
-  
+        for await (let item of result) {
+          item = await normalizeFindResult<T>(this.metadata, item, options)
+        }
       } else {
         result = await normalizeFindResult<T>(this.metadata, result, options)
       }
     }
   }
 
-  public find(query?: FilterQuery<T>): Promise<T[]> {
+  public async find(query?: FilterQuery<T>, options?: FindOptions<T>): Promise<T[]> {
     // Pre query
     this.preQuery(query)
 
-    return this.collection.find(query).toArray()
+    const result = await this.collection.find(query, options).toArray()
+
+    // Post query
+    await this.postQuery(result, options)
+
+    return result
   }
 
-  public async findOne(query: FilterQuery<T>, options?: FindOneOptions<T>): Promise<T> {
+  public async findOne(query: FilterQuery<T>, options?: FindOptions<T>): Promise<T> {
     // Pre query
     this.preQuery(query)
 

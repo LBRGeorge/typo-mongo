@@ -1,1 +1,1 @@
-export type Ref<T> = T | string 
+export type Ref<T> = T | string
